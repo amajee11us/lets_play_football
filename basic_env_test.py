@@ -1,3 +1,6 @@
+import os
+os.environ['LANG']='en_US'
+
 import gfootball.env as football_env
 '''
 Environments:
@@ -5,7 +8,6 @@ Environments:
 2. 11_vs_11_stochastic - 11 players a team doing stochastic movements
 '''
 env = football_env.create_environment(env_name= '11_vs_11_stochastic', representation='pixels', render=True)
-
 state = env.reset()
 
 while True:
