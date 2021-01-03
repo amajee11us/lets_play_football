@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from .mobilenet import mobilenet_v2
 
-class Actor:
+class Critic:
     def __init__(self, learn_rate, betas, model_tag="mobilenetV2", state_dict_path = None):
         '''
             Create the actor model
@@ -36,7 +36,8 @@ class Actor:
             param.requires_grad = False
         
         # 3. Now set the first conv layer to trainable
-        model.features[0][0].parameters().requires_grad = True
+        for param in model.features[0][0].parameters():
+            param.requires_grad = True
 
         self.model = model
 

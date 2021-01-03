@@ -7,12 +7,12 @@ class Actor:
         '''
             Create the actor model
         '''
-        self.action_dim = out_dim[-1] # HWC format
+        self.action_dim = out_dim
         self.latent_var = 64;
 
         self.lr = learn_rate
         self.betas= betas
-        
+
         self.model_name = model_tag
         self.model_path = state_dict_path
 
@@ -37,7 +37,8 @@ class Actor:
             param.requires_grad = False
         
         # 3. Now set the first conv layer to trainable
-        model.features[0][0].parameters().requires_grad = True
+        for param in model.features[0][0].parameters():
+            param.requires_grad = True
 
         self.model = model
 

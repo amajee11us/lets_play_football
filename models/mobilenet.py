@@ -103,9 +103,6 @@ class MobileNetV2(nn.Module):
         # building classifier
         self.classifier = nn.Linear(self.last_channel, n_class)
 
-        # To adjust to an environment the first layer should be trainable
-        self.first_layer = self.features[0][0]
-
         self._initialize_weights()
 
     def forward(self, x):
