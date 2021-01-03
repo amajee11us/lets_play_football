@@ -1,13 +1,18 @@
 import torch
-import torch.nn as NN
+import torch.nn as nn
 from .mobilenet import mobilenet_v2
 
 class Actor:
-    def __init__(self, model_tag="mobilenetV2", state_dict_path = None):
+    def __init__(self, learn_rate, betas, model_tag="mobilenetV2", state_dict_path = None):
         '''
             Create the actor model
         '''
-        self.out_channels = 1 # Outpt is a loss function
+        self.critic_channels = 1 # Outpt is a loss function
+        self.latent_var = 64
+
+        self.lr = learn_rate
+        self.betas= betas
+
         self.model_name = model_tag
         self.model_path = state_dict_path
 
@@ -16,9 +21,15 @@ class Actor:
         model = mobilenet_v2(pretrained=True)
 
         # 1. pickle the final classifier
-        final_layer_channels = model.classifier.in_features
-        model.classifier = NN.Linear(in_features=final_layer_channels,
-                                           out_features=self.out_channels)   
+        state_dim = model.classifier.in_features
+        model.classifier = nn.Sequential(
+                nn.Linear(state_dim, self.latent_var),
+                nn.Tanh(),
+                nn.Linear(self.latent_var, self.latent_var),
+                nn.Tanh(),
+                nn.Linear(self.latent_var, self.critic_channels)
+                )
+           
         
         # 2. Set the feature extractor to fixed
         for param in model.features.parameters():
@@ -27,7 +38,15 @@ class Actor:
         # 3. Now set the first conv layer to trainable
         model.features[0][0].parameters().requires_grad = True
 
+        self.model = model
+
         return model
 
     def _init_models(self):
         pass
+    
+    def get_loss_func(self):
+        return torch.nn.MSELoss()
+    
+    def get_optimizer(self):
+        return torch.optim.Adam(self.model.parameters(), lr=self.lr, betas=self.betas)
