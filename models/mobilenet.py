@@ -103,11 +103,14 @@ class MobileNetV2(nn.Module):
         # building classifier
         self.classifier = nn.Linear(self.last_channel, n_class)
 
+        # To adjust to an environment the first layer should be trainable
+        self.first_layer = self.features[0][0]
+
         self._initialize_weights()
 
     def forward(self, x):
         x = self.features(x)
-        x = x.mean(3).mean(2)
+        x = x.mean(3).mean(2) # flatten
         x = self.classifier(x)
         return x
 
@@ -130,7 +133,7 @@ class MobileNetV2(nn.Module):
 def mobilenet_v2(pretrained=True):
     model = MobileNetV2(width_mult=1)
 
-    if pretrained:
+    if pretrained is not False:
         try:
             from torch.hub import load_state_dict_from_url
         except ImportError:
