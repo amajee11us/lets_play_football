@@ -52,13 +52,28 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             action_dist = m_actor(state)
+            q_value = m_critic(state)
         
         print(action_dist.shape)
 
         action_dist = action_dist.cpu().numpy()
+        q_value = q_value.cpu().numpy()
+
         action = np.random.choice(n_actions, p=action_dist[0, :])
+        action_onehot = np.zeros(n_actions)
+        action_onehot[action] = 1 # set  value of onehot vector
 
         observation, reward, done, info = env.step(action)
+        mask = not done
+
+        states.append(state)
+        actions.append(action)
+        actions_onehot.append(action_onehot)
+        values.append(q_value)
+        masks.append(mask)
+        rewards.append(reward)
+        actions_probs.append(action_dist)
+
 
         state = observation
 
