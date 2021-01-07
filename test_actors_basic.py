@@ -6,6 +6,10 @@ import gfootball.env as football_env
 from models.actor import Actor
 from models.critic import Critic
 
+# Advantage calculation
+gamma = 0.99
+lmbda = 0.95
+
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -74,10 +78,21 @@ if __name__ == '__main__':
         rewards.append(reward)
         actions_probs.append(action_dist)
 
-
         state = observation
 
         if done:
             env.reset()
 
     env.close()
+
+def calculate_advantage(masks, q_values, rewards):
+    gae =0
+    returns_per_state = [] # this is tracked per step to achieve a goal
+
+    for i in reversed(range(len(rewards))):
+        delta = rewards[i] + (gamma * q_values[i + 1] * masks[i]) - values[i]
+        gae = delta + gamma * lmbda * masks[i] * gae
+        returns_per_state.insert(0, gae + values[i])
+    
+    adv = np.array(returns_per_state) - q_values[:-1]
+    return returns_per_state, (adv - np.mean(adv)) / (np.std(adv) + 1e-10)
