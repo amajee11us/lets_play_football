@@ -130,7 +130,7 @@ class MobileNetV2(nn.Module):
 def mobilenet_v2(pretrained=True):
     model = MobileNetV2(width_mult=1)
 
-    if pretrained is not False:
+    if pretrained:
         try:
             from torch.hub import load_state_dict_from_url
         except ImportError:

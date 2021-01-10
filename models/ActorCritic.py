@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn 
-from torch.distributions import Normal
+from torch.distributions import Categorical
+
 from .actor import Actor
 from .critic import Critic
 
@@ -9,11 +10,19 @@ class ActorCritic(nn.Module):
         '''
         Model : The Actor critic model
         '''
-        self.actor_model = Actor(out_dim_actor, learn_rate, betas)
-        self.critic_model = Critic(learn_rate, betas)
+        super(ActorCritic, self).__init__()
+
+        # initialize the actor and critic classes
+        actor = Actor(out_dim_actor, learn_rate, betas)
+        critic = Critic(learn_rate, betas)
+
+        self.actor_model = actor.get_model()
+        self.critic_model = critic.get_model()
 
         # logarithmic standard dev
-        self.log_std = nn.Parameter(torch.ones(1, out_dim_actor) * std)
+        #self.log_std = nn.Parameter(torch.ones(1, out_dim_actor) * std)
+
+        self.apply(init_weights)
 
     def forward(self, x):
         '''
@@ -23,6 +32,11 @@ class ActorCritic(nn.Module):
         mu = self.actor_model(x)
 
         # now create a action distribution
-        std   = self.log_std.exp().expand_as(mu)
-        dist  = Normal(mu, std) # following normal distribution
+        dist  = Categorical(mu) # following normal distribution
+        print(dist)
         return dist, value
+    
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        nn.init.normal_(m.weight, mean=0., std=0.1)
+        nn.init.constant_(m.bias, 0.1)
