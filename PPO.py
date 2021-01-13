@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.distributed import Categorical
+from torch.distributions import Categorical
 import numpy as np 
 
 class PPO:
@@ -23,6 +23,8 @@ class PPO:
         '''
         gae = 0
         returns_per_state = [] # this is tracked per step to achieve a goal
+
+        print(masks, q_values, rewards)
 
         for i in reversed(range(len(rewards))):
             delta = rewards[i] + (self.gamma * q_values[i + 1] * masks[i]) - q_values[i]
