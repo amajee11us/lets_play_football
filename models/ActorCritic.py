@@ -33,7 +33,6 @@ class ActorCritic(nn.Module):
 
         # now create a action distribution
         dist  = Categorical(mu) # following normal distribution
-        print(dist)
         return dist, value
     
 def init_weights(m):
