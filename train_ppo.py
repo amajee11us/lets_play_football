@@ -10,6 +10,23 @@ from models.critic import Critic
 from models.ActorCritic import ActorCritic
 from PPO import PPO
 
+def test_env(env, model, device):
+    state = env.reset()
+    model.eval()
+    done = False
+    total_reward = 0
+    while not done:
+        state = torch.FloatTensor(state).unsqueeze(0).to(device)
+        state = state.permute(0, 3, 1, 2)
+        dist, _ = model(state)
+        next_state, reward, done, _ = env.step(dist.sample().cpu().numpy()[0])
+
+        state = next_state
+        total_reward += reward
+    print("Reward gained : ", total_reward)
+    return total_reward
+
+
 if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -23,20 +40,26 @@ if __name__ == '__main__':
     n_actions = env.action_space.n 
     print(n_actions)
 
+    # Config options
     ppo_steps = 128
+    ppo_epochs = 4
+    batch_size = 5
     target_reached = False
+    threshold_reward = -200
     max_iters = 50
     iters = 0
 
     model = ActorCritic(n_actions, 0.002, (0.9, 0.999))
+    optimizer = model.optimizer
     model.to(device)
-    model.eval()
-
+    
     ppo_updator = PPO() # currently lets not change anything
 
     optim = torch.optim.Adam(model.parameters(), lr=0.002)
 
     print(model)    
+    # store the test rewards
+    test_rewards = []
 
     while not target_reached and iters < max_iters:
         '''
@@ -51,6 +74,9 @@ if __name__ == '__main__':
         entropy = 0
 
         for itr in range(ppo_steps):
+            # set model to train
+            model.train()
+
             # convert array state to tensor state
             state = torch.from_numpy(state).float().to(device)
             state = torch.unsqueeze(state, 0)
@@ -64,7 +90,7 @@ if __name__ == '__main__':
             next_state, reward, done, info = env.step(action.item())
 
             log_probs = action_dist.log_prob(action)
-            entropy += action_dist.entropy().mean()
+            entropy += ppo_updator._calc_entropy(action_dist)
                         
             print(" Iter : {} State shape : {} Reward: {} Mask : {} ".format(itr, state.shape, reward, done))
 
@@ -85,7 +111,6 @@ if __name__ == '__main__':
             rewards.append(reward)
 
             state = next_state # update to next state
-
             if done:
                 env.reset()
         # compute the actor critic prob distribution
@@ -98,16 +123,25 @@ if __name__ == '__main__':
         returns =  ppo_updator.calc_returns(masks, values, rewards, next_value)
        
         returns = torch.cat(returns).detach()
-        actions_probs = torch.cat([log_prob.unsqueeze(1) for log_prob in actions_probs], 1).detach()
+        actions_probs = torch.cat([log_prob.unsqueeze(1) for log_prob in actions_probs]).detach()
         values = torch.cat(values).detach()
-        states = torch.cat(states).detach()
-        actions = torch.cat(actions).detach()
+        states = torch.cat(states)
+        actions = torch.cat(actions).unsqueeze(1)
         advantages = returns - values
-
-        print(advantages) # TODO: remove
-        # TODO: compute the PPO loss and update model
-           
-        iters += 1 # increment the iterator
+        
+        # Compute the PPO loss and update model
+        ppo_updator.update_backward(model, optimizer, states, actions, actions_probs, returns, advantages)
+        
+        # Run tests
+        if iters % 5 == 0:
+            print("Running test ...")
+            test_reward = np.mean([test_env(env, model, device) for _ in range(10)])
+            test_rewards.append(test_reward)
+            if test_reward > threshold_reward:
+                target_reached = True
+        
+        # increment the iterator
+        iters += 1 
         env.reset()
 
     env.close()
