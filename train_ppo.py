@@ -74,8 +74,8 @@ if __name__ == '__main__':
             mask = torch.FloatTensor(1 - done).unsqueeze(1).to(device)
             '''
             
-            reward = torch.FloatTensor([reward])
-            mask = torch.FloatTensor([1 - done])
+            reward = torch.FloatTensor([reward]).to(device)
+            mask = torch.FloatTensor([1 - done]).to(device)
 
             states.append(state)
             actions.append(action)
@@ -83,7 +83,6 @@ if __name__ == '__main__':
             values.append(q_value)
             masks.append(mask)
             rewards.append(reward)
-            actions_probs.append(action_dist)
 
             state = next_state # update to next state
 
@@ -95,9 +94,17 @@ if __name__ == '__main__':
         next_state = next_state.permute(0, 3, 1, 2)
 
         # compute advantage
-        _, next_value = model(next_state)
-        returns, _ =  ppo_updator.calc_advantage(masks, next_value, rewards)
-        print(returns)
+        _, next_value = model(next_state) # this is the critic's decision
+        returns =  ppo_updator.calc_returns(masks, values, rewards, next_value)
+       
+        returns = torch.cat(returns).detach()
+        actions_probs = torch.cat([log_prob.unsqueeze(1) for log_prob in actions_probs], 1).detach()
+        values = torch.cat(values).detach()
+        states = torch.cat(states).detach()
+        actions = torch.cat(actions).detach()
+        advantages = returns - values
+
+        print(advantages) # TODO: remove
         # TODO: compute the PPO loss and update model
            
         iters += 1 # increment the iterator

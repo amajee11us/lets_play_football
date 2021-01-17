@@ -17,22 +17,20 @@ class PPO:
 
         self.MSEloss = torch.nn.MSELoss()
 
-    def calc_advantage(self, masks, q_values, rewards):
+    def calc_returns(self, masks, q_values, rewards, next_value):
         '''
         Genearlized Advantage Estimation Algorithm
         '''
+        q_values = q_values + [next_value] # decouple it so that the final value is not affected
         gae = 0
         returns_per_state = [] # this is tracked per step to achieve a goal
-
-        print(masks, q_values, rewards)
 
         for i in reversed(range(len(rewards))):
             delta = rewards[i] + (self.gamma * q_values[i + 1] * masks[i]) - q_values[i]
             gae = delta + self.gamma * self.lmbda * masks[i] * gae
             returns_per_state.insert(0, gae + q_values[i])
-        
-        adv = np.array(returns_per_state) - q_values[:-1]
-        return returns_per_state, (adv - np.mean(adv)) / (np.std(adv) + 1e-10)
+                
+        return returns_per_state
     
     def _calc_entropy(self, action_dist):
         '''
