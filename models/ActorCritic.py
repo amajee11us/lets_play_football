@@ -19,6 +19,8 @@ class ActorCritic(nn.Module):
         self.actor_model = actor.get_model()
         self.critic_model = critic.get_model()
 
+        self.optimizer = actor.get_optimizer()
+
         # logarithmic standard dev
         #self.log_std = nn.Parameter(torch.ones(1, out_dim_actor) * std)
 
