@@ -4,6 +4,7 @@ from torch.distributions import Normal
 import numpy as np
 import gfootball.env as football_env
 import gym
+from tqdm import tqdm
 
 from models.actor import Actor
 from models.critic import Critic
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # This is the main function
-    env = football_env.create_environment(env_name='academy_empty_goal', representation='pixels', render=True)
+    env = football_env.create_environment(env_name='academy_empty_goal', stacked=False, rewards="scoring,checkpoints", representation='pixels', render=True)
     state = env.reset()
 
     state_dims = env.observation_space.shape
@@ -45,7 +46,7 @@ if __name__ == '__main__':
     ppo_epochs = 4
     batch_size = 5
     target_reached = False
-    threshold_reward = -200
+    threshold_reward = 200
     max_iters = 50
     iters = 0
 
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     optimizer = model.optimizer
     model.to(device)
     
-    ppo_updator = PPO() # currently lets not change anything
+    ppo_updator = PPO(logdir='outputs/gfootball_512_set/') # currently lets not change anything
 
     optim = torch.optim.Adam(model.parameters(), lr=0.002)
 
@@ -73,9 +74,9 @@ if __name__ == '__main__':
         actions_probs = []
         entropy = 0
 
-        for itr in range(ppo_steps):
+        for itr in tqdm(range(ppo_steps), desc=" Forward pass {} : ".format(iters)):
             # set model to train
-            model.train()
+            model.eval()
 
             # convert array state to tensor state
             state = torch.from_numpy(state).float().to(device)
@@ -87,12 +88,12 @@ if __name__ == '__main__':
                         
             # Perform an action
             action = action_dist.sample()
-            next_state, reward, done, info = env.step(action.item())
+            next_state, reward, done, info = env.step(action.detach().cpu().numpy().squeeze())
 
             log_probs = action_dist.log_prob(action)
             entropy += ppo_updator._calc_entropy(action_dist)
                         
-            print(" Iter : {} State shape : {} Reward: {} Mask : {} ".format(itr, state.shape, reward, done))
+            #print(" Iter : {} State shape : {} Reward: {} Mask : {} ".format(itr, state.shape, reward, done))
 
             '''
             # NOTE : only if multiple envs are present
@@ -130,7 +131,7 @@ if __name__ == '__main__':
         advantages = returns - values
         
         # Compute the PPO loss and update model
-        ppo_updator.update_backward(model, optimizer, states, actions, actions_probs, returns, advantages)
+        ppo_updator.update_backward(model, optimizer, states, actions, actions_probs, returns, advantages, iters)
         
         # Run tests
         if iters % 5 == 0:
