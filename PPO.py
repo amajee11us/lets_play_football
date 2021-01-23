@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 from torch.distributions import Categorical
 import numpy as np 
+import tensorboardX as tb
 
 class PPO:
 
-    def __init__(self, epochs=4, batch_size=5, learn_rate= 0.01, betas= (0.9, 0.999), eps_clip=0.2, gamma=0.99, lmbda=0.95):
+    def __init__(self, epochs=4, batch_size=5, learn_rate= 0.01, betas= (0.9, 0.999), eps_clip=0.2, gamma=0.99, lmbda=0.95, logdir='output/'):
         # Advantage calculation
         self.gamma = gamma # discount factor
         self.lmbda = lmbda # smoothing factor
@@ -18,6 +19,7 @@ class PPO:
         self.batch_size = batch_size
 
         self.MSEloss = torch.nn.MSELoss()
+        self.writer =  tb.SummaryWriter(log_dir=logdir)
 
     def calc_returns(self, masks, q_values, rewards, next_value):
         '''
@@ -48,7 +50,18 @@ class PPO:
             # return states for each batch
             yield states[rand_ids, :], actions[rand_ids, :], log_probs[rand_ids, :], returns[rand_ids, :], advantages[rand_ids, :]
 
-    def update_backward(self, model, optimizer, states, actions, action_probs, returns, advantages):
+    def update_backward(self, model, optimizer, states, actions, action_probs, returns, advantages, round):
+        model.train()
+
+        # Intermediate Statistics
+        count_steps = 0
+        sum_returns = 0.0
+        sum_advantage = 0.0
+        sum_loss_actor = 0.0
+        sum_loss_critic = 0.0
+        sum_entropy = 0.0
+        sum_loss_total = 0.0
+
         for _ in range(self.ppo_epochs):
             for state, action, prev_log_prob, return_, advantage in self.__do_iter(self.batch_size, states, actions, action_probs, returns, advantages):
                 pdist, q_value = model(state)
@@ -67,3 +80,20 @@ class PPO:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+
+                # track statistics
+                sum_returns += return_.mean()
+                sum_advantage += advantage.mean()
+                sum_loss_actor += actor_loss
+                sum_loss_critic += critic_loss
+                sum_loss_total += loss
+                sum_entropy += entropy
+                
+                count_steps += 1
+            
+        self.writer.add_scalar("returns", sum_returns / count_steps, round)
+        self.writer.add_scalar("advantage", sum_advantage / count_steps, round)
+        self.writer.add_scalar("loss_actor", sum_loss_actor / count_steps, round)
+        self.writer.add_scalar("loss_critic", sum_loss_critic / count_steps, round)
+        self.writer.add_scalar("entropy", sum_entropy / count_steps, round)
+        self.writer.add_scalar("loss_total", sum_loss_total / count_steps, round)
